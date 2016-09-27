@@ -7,7 +7,7 @@ import StringIO
 import requests
 
 from google.protobuf import descriptor
-from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
+from google.protobuf.internal.containers import RepeatedCompositeFieldContainer, RepeatedScalarFieldContainer
 from google.protobuf import text_format
 from google.protobuf.message import Message, DecodeError
 
@@ -57,6 +57,16 @@ class GooglePlayAPI(object):
     def toDict(self, protoObj):
         """Converts the (protobuf) result from an API call into a dict, for
         easier introspection."""
+
+        if not (isinstance(protoObj, RepeatedCompositeFieldContainer) or isinstance(protoObj, RepeatedScalarFieldContainer) or isinstance(protoObj, Message)):
+            return protoObj
+
+        if isinstance(protoObj, RepeatedScalarFieldContainer):
+            arr = []
+            for val in protoObj:
+                arr.append(self.toDict(val))
+            return arr
+
         iterable = False
         if isinstance(protoObj, RepeatedCompositeFieldContainer):
             iterable = True
@@ -68,7 +78,7 @@ class GooglePlayAPI(object):
             msg = dict()
             for fielddesc, value in po.ListFields():
                 #print value, type(value), getattr(value, "__iter__", False)
-                if fielddesc.type == descriptor.FieldDescriptor.TYPE_GROUP or isinstance(value, RepeatedCompositeFieldContainer) or isinstance(value, Message):
+                if fielddesc.type == descriptor.FieldDescriptor.TYPE_GROUP or isinstance(value, RepeatedCompositeFieldContainer) or isinstance(value, RepeatedScalarFieldContainer) or isinstance(value, Message):
                     msg[fielddesc.name] = self.toDict(value)
                 else:
                     msg[fielddesc.name] = value
@@ -262,6 +272,10 @@ class GooglePlayAPI(object):
         path = "purchase"
         data = "ot=%d&doc=%s&vc=%d" % (offerType, packageName, versionCode)
         message = self.executeRequestApi2(path, data)
+
+        if message.HasField('commands'):
+            print(self.toDict(message))
+            return None
 
         url = message.payload.buyResponse.purchaseStatusResponse.appDeliveryData.downloadUrl
         cookie = message.payload.buyResponse.purchaseStatusResponse.appDeliveryData.downloadAuthCookie[0]
